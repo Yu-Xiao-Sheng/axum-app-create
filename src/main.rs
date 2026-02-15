@@ -1,22 +1,30 @@
 // axum-app-create: A CLI tool to scaffold Axum web applications
 //
 // This tool generates new Axum projects with sensible defaults and optional features.
+// v0.3.0 introduces subcommands: new, init-template, update
 
 use axum_app_create::cli::{is_non_interactive, prompts::prompt_project_config};
+use axum_app_create::config::user_config::{UserConfig, resolve_template_dir};
 use axum_app_create::config::{DatabaseOption, Preset, ProjectMode};
 use axum_app_create::error::CliError;
-use axum_app_create::generator::project::{generate_project, get_success_message_with_config};
+use axum_app_create::generator::project::get_success_message_with_config;
+use axum_app_create::template::exporter::TemplateExporter;
+use axum_app_create::updater::engine::UpdateEngine;
 use axum_app_create::utils::rust_toolchain::check_rust_toolchain;
-use clap::Parser;
-use std::path::PathBuf;
+use clap::{Parser, Subcommand};
+use std::path::{Path, PathBuf};
 
 /// Simple CLI tool to scaffold Axum web applications
 #[derive(Parser, Debug)]
 #[command(name = "axum-app-create")]
 #[command(about = "Scaffold a new Axum web application", long_about = None)]
-#[command(version = "0.2.0")]
-struct CliArgs {
-    /// Project name (positional argument or --project-name)
+#[command(version = "0.3.0")]
+struct Cli {
+    #[command(subcommand)]
+    command: Option<Commands>,
+
+    // Top-level args for backward compatibility (no subcommand = `new`)
+    /// Project name (positional argument)
     #[arg(value_name = "PROJECT_NAME")]
     project_name: Option<String>,
 
@@ -59,6 +67,82 @@ struct CliArgs {
     /// Non-interactive mode (fail if required values missing)
     #[arg(long)]
     non_interactive: bool,
+
+    /// Custom template directory
+    #[arg(long, value_name = "DIR")]
+    template_dir: Option<PathBuf>,
+}
+
+#[derive(Subcommand, Debug)]
+enum Commands {
+    /// 创建新项目 / Create a new project
+    New {
+        /// Project name
+        #[arg(value_name = "PROJECT_NAME")]
+        project_name: Option<String>,
+
+        #[arg(long)]
+        author: Option<String>,
+
+        #[arg(long, value_name = "TYPE")]
+        database: Option<String>,
+
+        #[arg(long)]
+        auth: bool,
+
+        #[arg(long)]
+        biz_error: bool,
+
+        #[arg(long, value_name = "LEVEL")]
+        log_level: Option<String>,
+
+        #[arg(long, value_name = "MODE")]
+        mode: Option<String>,
+
+        #[arg(long, value_name = "PRESET")]
+        preset: Option<String>,
+
+        #[arg(long)]
+        ci: bool,
+
+        #[arg(long)]
+        force: bool,
+
+        #[arg(long)]
+        non_interactive: bool,
+
+        /// Custom template directory
+        #[arg(long, value_name = "DIR")]
+        template_dir: Option<PathBuf>,
+    },
+    /// 导出内置模板 / Export built-in templates for customization
+    InitTemplate {
+        /// Output directory (default: ./templates)
+        #[arg(default_value = "./templates")]
+        output_dir: PathBuf,
+
+        /// Project mode: single or workspace
+        #[arg(long, default_value = "single")]
+        mode: String,
+    },
+    /// 更新已生成的项目 / Update a previously generated project
+    Update {
+        /// Project directory (default: current directory)
+        #[arg(default_value = ".")]
+        project_dir: PathBuf,
+
+        /// Show what would change without modifying files
+        #[arg(long)]
+        dry_run: bool,
+
+        /// Force overwrite all files (ignore user modifications)
+        #[arg(long)]
+        force: bool,
+
+        /// Custom template directory
+        #[arg(long, value_name = "DIR")]
+        template_dir: Option<PathBuf>,
+    },
 }
 
 /// Format error message with troubleshooting guidance
@@ -89,10 +173,157 @@ fn main() -> anyhow::Result<()> {
         )
         .init();
 
-    let args = CliArgs::parse();
+    let cli = Cli::parse();
 
-    println!("\n🦀 axum-app-create CLI Tool v0.2.0");
+    println!("\n🦀 axum-app-create CLI Tool v0.3.0");
 
+    // Load user configuration file
+    let user_config = UserConfig::load();
+
+    match cli.command {
+        Some(Commands::InitTemplate { output_dir, mode }) => run_init_template(&output_dir, &mode),
+        Some(Commands::Update {
+            project_dir,
+            dry_run,
+            force,
+            template_dir,
+        }) => {
+            let resolved_dir = resolve_template_dir(template_dir, &user_config);
+            run_update(&project_dir, dry_run, force, resolved_dir)
+        }
+        Some(Commands::New {
+            project_name,
+            author,
+            database,
+            auth,
+            biz_error,
+            log_level,
+            mode,
+            preset,
+            ci,
+            force,
+            non_interactive,
+            template_dir,
+        }) => {
+            let resolved_dir = resolve_template_dir(template_dir, &user_config);
+            run_new(
+                project_name,
+                author,
+                database,
+                auth,
+                biz_error,
+                log_level,
+                mode,
+                preset,
+                ci,
+                force,
+                non_interactive,
+                resolved_dir,
+            )
+        }
+        None => {
+            // Backward compatibility: no subcommand = `new`
+            let resolved_dir = resolve_template_dir(cli.template_dir, &user_config);
+            run_new(
+                cli.project_name,
+                cli.author,
+                cli.database,
+                cli.auth,
+                cli.biz_error,
+                cli.log_level,
+                cli.mode,
+                cli.preset,
+                cli.ci,
+                cli.force,
+                cli.non_interactive,
+                resolved_dir,
+            )
+        }
+    }
+}
+
+fn run_init_template(output_dir: &Path, mode: &str) -> anyhow::Result<()> {
+    let project_mode = match mode {
+        "single" => ProjectMode::Single,
+        "workspace" => ProjectMode::Workspace,
+        other => {
+            eprintln!(
+                "\n❌ 无效的模式 / Invalid mode: '{}'\n\
+                 💡 有效选项 / Valid options: single, workspace",
+                other
+            );
+            std::process::exit(1);
+        }
+    };
+
+    match TemplateExporter::export(project_mode, output_dir) {
+        Ok(()) => {
+            println!(
+                "\n💡 使用方法 / Usage:\n\
+                 1. 编辑模板文件 / Edit template files in: {}\n\
+                 2. 使用自定义模板生成项目 / Generate with custom templates:\n\
+                    axum-app-create new my-app --template-dir {}",
+                output_dir.display(),
+                output_dir.display()
+            );
+        }
+        Err(e) => {
+            eprintln!("\n❌ {}", format_error_message(&e));
+            std::process::exit(1);
+        }
+    }
+
+    Ok(())
+}
+
+fn run_update(
+    project_dir: &Path,
+    dry_run: bool,
+    force: bool,
+    template_dir: Option<PathBuf>,
+) -> anyhow::Result<()> {
+    if dry_run {
+        println!("🔍 Dry-run 模式 / Dry-run mode: 不会修改任何文件 / No files will be modified");
+    }
+
+    let engine = UpdateEngine::new(project_dir.to_path_buf(), dry_run, force, template_dir);
+
+    match engine.update(true) {
+        Ok(report) => {
+            println!("\n{}", report.summary());
+
+            if !report.files_conflicted.is_empty() {
+                println!("\n⚠️  冲突文件 / Conflicted files:");
+                for f in &report.files_conflicted {
+                    println!("  ⚠️  {}", f);
+                }
+                println!("\n💡 使用 --force 强制覆盖 / Use --force to overwrite all files");
+            }
+        }
+        Err(e) => {
+            eprintln!("\n❌ {}", format_error_message(&e));
+            std::process::exit(1);
+        }
+    }
+
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn run_new(
+    project_name: Option<String>,
+    author: Option<String>,
+    database: Option<String>,
+    auth: bool,
+    biz_error: bool,
+    log_level: Option<String>,
+    mode: Option<String>,
+    preset: Option<String>,
+    ci: bool,
+    force: bool,
+    non_interactive: bool,
+    template_dir: Option<PathBuf>,
+) -> anyhow::Result<()> {
     // Check Rust toolchain
     if let Err(e) = check_rust_toolchain() {
         eprintln!("\n❌ {}", e);
@@ -100,7 +331,7 @@ fn main() -> anyhow::Result<()> {
     }
 
     // Parse database option from CLI flag
-    let cli_database = args.database.as_deref().map(|d| match d {
+    let cli_database = database.as_deref().map(|d| match d {
         "postgresql" | "postgres" | "pg" => DatabaseOption::PostgreSQL,
         "sqlite" => DatabaseOption::SQLite,
         "both" => DatabaseOption::Both,
@@ -116,7 +347,7 @@ fn main() -> anyhow::Result<()> {
     });
 
     // Parse mode from CLI flag
-    let cli_mode = args.mode.as_deref().map(|m| match m {
+    let cli_mode = mode.as_deref().map(|m| match m {
         "single" => ProjectMode::Single,
         "workspace" => ProjectMode::Workspace,
         other => {
@@ -130,7 +361,7 @@ fn main() -> anyhow::Result<()> {
     });
 
     // Parse preset from CLI flag
-    let cli_preset = args.preset.as_deref().map(|p| match p {
+    let cli_preset = preset.as_deref().map(|p| match p {
         "minimal" => Preset::Minimal,
         "api" => Preset::Api,
         "fullstack" => Preset::Fullstack,
@@ -145,7 +376,7 @@ fn main() -> anyhow::Result<()> {
     });
 
     // Validate log level if provided
-    if let Some(ref level) = args.log_level
+    if let Some(ref level) = log_level
         && !["trace", "debug", "info", "warn", "error"].contains(&level.as_str())
     {
         eprintln!(
@@ -157,22 +388,22 @@ fn main() -> anyhow::Result<()> {
     }
 
     // Determine if we're in interactive mode
-    let interactive = !is_non_interactive(args.non_interactive);
+    let interactive = !is_non_interactive(non_interactive);
 
     // Build CLI overrides
     let cli_overrides = axum_app_create::cli::prompts::CliOverrides {
         database: cli_database,
-        auth: if args.auth { Some(true) } else { None },
-        biz_error: if args.biz_error { Some(true) } else { None },
-        log_level: args.log_level,
-        author: args.author,
+        auth: if auth { Some(true) } else { None },
+        biz_error: if biz_error { Some(true) } else { None },
+        log_level,
+        author,
         mode: cli_mode,
         preset: cli_preset,
-        ci: if args.ci { Some(true) } else { None },
+        ci: if ci { Some(true) } else { None },
     };
 
     // Get project configuration
-    let config = match prompt_project_config(interactive, args.project_name, Some(cli_overrides)) {
+    let config = match prompt_project_config(interactive, project_name, Some(cli_overrides)) {
         Ok(cfg) => cfg,
         Err(e) => {
             eprintln!("\n❌ {}", e);
@@ -183,10 +414,15 @@ fn main() -> anyhow::Result<()> {
     // Determine project directory
     let project_dir = PathBuf::from(&config.project_name);
 
-    // Generate project
-    match generate_project(&project_dir, &config, interactive, args.force) {
+    // Generate project (with optional custom templates via TemplateResolver)
+    match axum_app_create::generator::project::generate_project_with_templates(
+        &project_dir,
+        &config,
+        interactive,
+        force,
+        template_dir,
+    ) {
         Ok(()) => {
-            // Print success message
             let message = get_success_message_with_config(&project_dir, &config);
             println!("{}", message);
         }

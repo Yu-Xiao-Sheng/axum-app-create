@@ -1,3 +1,4 @@
+{{#block "imports"}}
 use axum::Router;
 
 #[path = "config.rs"]
@@ -15,9 +16,12 @@ mod auth;
 mod health;
 
 use config::Config;
+{{/block}}
 
+{{#block "main_body"}}
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+{{#block "config"}}
 {{#if has_logging}}
     // Initialize tracing
     tracing_subscriber::fmt()
@@ -45,13 +49,18 @@ async fn main() -> anyhow::Result<()> {
         tracing::info!("JWT authentication enabled");
     }
 {{/if}}
+{{/block}}
 
+{{#block "middleware"}}
+{{/block}}
     // Build our application with routes
     let app = Router::new()
+{{#block "routes"}}
         .merge(health::router())
         {{#if has_auth}}
         .merge(auth::router())
-        {{/if}};
+        {{/if}}
+{{/block}};
 
     let bind_address = config.bind_address();
     let listener = tokio::net::TcpListener::bind(&bind_address).await?;
@@ -62,3 +71,4 @@ async fn main() -> anyhow::Result<()> {
 
     Ok(())
 }
+{{/block}}

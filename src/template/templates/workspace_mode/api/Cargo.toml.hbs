@@ -9,6 +9,7 @@ name = "{{project_name}}"
 path = "src/main.rs"
 
 [dependencies]
+{{#block "dependencies"}}
 {{project_name}}-domain = { path = "../domain" }
 {{project_name}}-infrastructure = { path = "../infrastructure" }
 {{project_name}}-common = { path = "../common" }
@@ -25,3 +26,4 @@ anyhow = "1"
 jsonwebtoken = "10"
 bcrypt = "0.18"
 {{/if}}
+{{/block}}

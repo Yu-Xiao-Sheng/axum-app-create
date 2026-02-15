@@ -7,10 +7,10 @@ use crate::config::ProjectMode;
 use crate::error::{CliError, Result};
 use crate::template::context::TemplateContext;
 use crate::template::engine::TemplateEngine;
-use crate::template::templates::{
-    get_ci_templates, get_single_mode_templates, get_workspace_mode_templates,
-};
-use std::path::Path;
+use crate::template::resolver::TemplateResolver;
+use crate::updater::checksum::ChecksumCalculator;
+use crate::updater::metadata::MetadataManager;
+use std::path::{Path, PathBuf};
 
 /// Generate a new project with the given configuration
 ///
@@ -33,6 +33,17 @@ pub fn generate_project(
     config: &ProjectConfig,
     interactive: bool,
     force: bool,
+) -> Result<()> {
+    generate_project_with_templates(project_dir, config, interactive, force, None)
+}
+
+/// Generate a new project with optional custom template directory
+pub fn generate_project_with_templates(
+    project_dir: &Path,
+    config: &ProjectConfig,
+    interactive: bool,
+    force: bool,
+    template_dir: Option<PathBuf>,
 ) -> Result<()> {
     // Validate project directory doesn't exist
     if project_dir.exists() {
@@ -119,23 +130,18 @@ pub fn generate_project(
     // Create template engine
     let engine = TemplateEngine::new();
 
-    // Select templates based on project mode
-    let mut templates = match config.mode {
-        ProjectMode::Single => get_single_mode_templates(),
-        ProjectMode::Workspace => get_workspace_mode_templates(),
-    };
-
-    // Append CI templates if enabled
-    if config.ci {
-        templates.extend(get_ci_templates());
-    }
+    // Resolve templates (built-in + optional custom templates)
+    let resolver = TemplateResolver::new(template_dir);
+    let resolved = resolver.resolve(config.mode, config.ci)?;
 
     // Render and write each template
     println!("\n📝 Generating files:");
 
-    for (name, template_file) in templates {
+    let mut generated_files: Vec<String> = Vec::new();
+
+    for (name, template) in &resolved {
         // Render template
-        let rendered = engine.render_template(name, template_file.content, &ctx)?;
+        let rendered = engine.render_template(name, &template.content, &ctx)?;
 
         // Skip files that render to empty content (conditional templates)
         if rendered.trim().is_empty() {
@@ -143,14 +149,21 @@ pub fn generate_project(
         }
 
         // Write file
-        write_file(project_dir, template_file.path, &rendered)?;
+        write_file(project_dir, &template.path, &rendered)?;
+        generated_files.push(template.path.clone());
 
-        println!("  ✓ Created {}", template_file.path);
+        println!("  ✓ Created {}", template.path);
     }
 
     // Initialize git repository
     println!("\n🔧 Initializing git repository...");
     super::git::init_git_repo(project_dir)?;
+
+    // Write generation metadata (.axum-app-create.json)
+    println!("📋 Writing generation metadata...");
+    let file_checksums = ChecksumCalculator::calculate_all(project_dir, &generated_files)?;
+    MetadataManager::create(project_dir, config, file_checksums)?;
+    println!("  ✓ Created {}", crate::updater::metadata::METADATA_FILE);
 
     // Update dependencies to latest compatible versions
     println!("📦 Updating dependencies to latest compatible versions...");
@@ -442,5 +455,128 @@ mod tests {
         assert!(project_dir.join(".env.example").exists());
         assert!(project_dir.join(".gitignore").exists());
         assert!(project_dir.join("README.md").exists());
+    }
+
+    #[test]
+    fn test_generate_project_creates_metadata() {
+        let temp_dir = TempDir::new().unwrap();
+        let project_dir = temp_dir.path().join("meta-test-app");
+        let mut config = ProjectConfig::default();
+        config.project_name = "meta-test-app".to_string();
+
+        generate_project(&project_dir, &config, false, false).unwrap();
+
+        // Verify metadata file exists
+        let metadata_path = project_dir.join(crate::updater::metadata::METADATA_FILE);
+        assert!(metadata_path.exists(), "Metadata file should be created");
+
+        // Verify metadata is valid JSON
+        let metadata = crate::updater::metadata::MetadataManager::read(&project_dir).unwrap();
+        assert_eq!(metadata.config.project_name, "meta-test-app");
+        assert!(!metadata.file_checksums.is_empty(), "Should have checksums");
+
+        // Verify .gitignore contains metadata file entry
+        let gitignore = std::fs::read_to_string(project_dir.join(".gitignore")).unwrap();
+        assert!(
+            gitignore.contains(".axum-app-create.json"),
+            ".gitignore should exclude metadata file"
+        );
+    }
+}
+
+#[cfg(test)]
+mod proptests {
+    use super::*;
+    use crate::config::{DatabaseOption, FeatureSet};
+    use crate::updater::checksum::ChecksumCalculator;
+    use crate::updater::metadata::MetadataManager;
+    use proptest::prelude::*;
+    use tempfile::TempDir;
+
+    fn arb_project_config() -> impl Strategy<Value = ProjectConfig> {
+        (
+            prop_oneof![Just(ProjectMode::Single), Just(ProjectMode::Workspace)],
+            prop_oneof![
+                Just(DatabaseOption::None),
+                Just(DatabaseOption::PostgreSQL),
+                Just(DatabaseOption::SQLite),
+                Just(DatabaseOption::Both),
+            ],
+            prop::bool::ANY,
+            prop::bool::ANY,
+            prop::bool::ANY,
+        )
+            .prop_map(|(mode, db, auth, biz_error, ci)| {
+                let features = FeatureSet {
+                    database: db,
+                    authentication: auth,
+                    logging: true,
+                    biz_error,
+                };
+                let mut config = ProjectConfig {
+                    project_name: "prop-test-app".to_string(),
+                    features,
+                    mode,
+                    ci,
+                    ..Default::default()
+                };
+                if db.is_enabled() {
+                    config.database = Some(crate::config::DatabaseConfig::default());
+                }
+                if auth {
+                    config.authentication = Some(crate::config::AuthConfig::default());
+                }
+                if biz_error {
+                    config.biz_error = Some(crate::config::BizErrorConfig::default());
+                }
+                config
+            })
+    }
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(20))]
+
+        /// Property 10: Metadata contains checksums for all generated files
+        /// After project generation, .axum-app-create.json should contain a checksum
+        /// entry for every generated file, and each checksum should match the SHA-256
+        /// of the corresponding file's content on disk.
+        /// Feature: v030-template-and-update, Property 10: Metadata checksum completeness
+        /// **Validates: Requirements 5.2, 5.4**
+        #[test]
+        fn prop_metadata_checksum_completeness(config in arb_project_config()) {
+            let temp_dir = TempDir::new().unwrap();
+            let project_dir = temp_dir.path().join("prop-test-app");
+
+            let result = generate_project(&project_dir, &config, false, false);
+            prop_assert!(result.is_ok(), "Generation failed: {:?}", result.err());
+
+            // Read metadata
+            let metadata = MetadataManager::read(&project_dir).unwrap();
+
+            // Every file in checksums should exist on disk and match
+            for (file_path, stored_checksum) in &metadata.file_checksums {
+                let full_path = project_dir.join(file_path);
+                prop_assert!(
+                    full_path.exists(),
+                    "File in metadata does not exist on disk: {}",
+                    file_path
+                );
+
+                let content = std::fs::read(&full_path).unwrap();
+                let actual_checksum = ChecksumCalculator::calculate(&content);
+                prop_assert_eq!(
+                    stored_checksum,
+                    &actual_checksum,
+                    "Checksum mismatch for file: {}",
+                    file_path
+                );
+            }
+
+            // Metadata should have at least the core files
+            prop_assert!(
+                metadata.file_checksums.contains_key("Cargo.toml"),
+                "Metadata should contain Cargo.toml checksum"
+            );
+        }
     }
 }

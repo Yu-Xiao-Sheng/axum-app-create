@@ -1,6 +1,6 @@
 [package]
 name = "axum-app-create"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2024"
 description = "A command-line tool to quickly create Axum web applications"
 license = "MIT OR Apache-2.0"
@@ -47,3 +47,15 @@ proptest = "1"
 
 # Date/time for templates
 chrono = "0.4"
+
+# SHA-256 checksum
+sha2 = "0.10"
+
+# User config file parsing
+toml = "0.8"
+
+# File diff comparison
+similar = "2"
+
+# Cross-platform home directory
+dirs = "6"

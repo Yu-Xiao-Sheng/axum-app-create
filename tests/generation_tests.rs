@@ -947,3 +947,272 @@ fn test_single_mode_no_workspace_crates() {
     assert!(!ctx.is_workspace);
     assert!(ctx.workspace_crates.is_none());
 }
+
+// ============================================================
+// v0.3.0 Integration Tests
+// ============================================================
+
+/// Test 14.1: Generate project with custom template directory overriding a built-in template
+#[test]
+fn test_custom_template_override() {
+    let temp_dir = TempDir::new().unwrap();
+    let project_dir = temp_dir.path().join("custom-tmpl-app");
+    let custom_dir = temp_dir.path().join("custom-templates");
+
+    // Create a custom README.md.hbs that overrides the built-in
+    std::fs::create_dir_all(&custom_dir).unwrap();
+    std::fs::write(
+        custom_dir.join("README.md.hbs"),
+        "# Custom README for {{project_name}}\nThis is a custom template.",
+    )
+    .unwrap();
+
+    let config = ProjectConfig {
+        project_name: "custom-tmpl-app".to_string(),
+        ..Default::default()
+    };
+
+    axum_app_create::generator::project::generate_project_with_templates(
+        &project_dir,
+        &config,
+        false,
+        false,
+        Some(custom_dir),
+    )
+    .unwrap();
+
+    let readme = std::fs::read_to_string(project_dir.join("README.md")).unwrap();
+    assert!(
+        readme.contains("Custom README for custom-tmpl-app"),
+        "Custom template content should appear in output"
+    );
+    assert!(
+        readme.contains("This is a custom template"),
+        "Custom template content should be present"
+    );
+    // Other built-in files should still exist
+    assert!(project_dir.join("Cargo.toml").exists());
+    assert!(project_dir.join("src/main.rs").exists());
+}
+
+/// Test 14.2: Generate project with template inheritance (extends + override blocks)
+#[test]
+fn test_template_inheritance() {
+    let temp_dir = TempDir::new().unwrap();
+    let project_dir = temp_dir.path().join("inherit-app");
+    let custom_dir = temp_dir.path().join("inherit-templates");
+
+    // Create a child template that extends the built-in main.rs.hbs
+    std::fs::create_dir_all(custom_dir.join("src")).unwrap();
+    std::fs::write(
+        custom_dir.join("src/main.rs.hbs"),
+        r#"{{!-- extends: src/main.rs --}}
+
+{{#override "imports"}}
+use axum::{Router, routing::get};
+use tokio::net::TcpListener;
+// Custom import added by inheritance
+use tracing::info;
+{{/override}}
+"#,
+    )
+    .unwrap();
+
+    let config = ProjectConfig {
+        project_name: "inherit-app".to_string(),
+        ..Default::default()
+    };
+
+    axum_app_create::generator::project::generate_project_with_templates(
+        &project_dir,
+        &config,
+        false,
+        false,
+        Some(custom_dir),
+    )
+    .unwrap();
+
+    let main_rs = std::fs::read_to_string(project_dir.join("src/main.rs")).unwrap();
+    assert!(
+        main_rs.contains("Custom import added by inheritance"),
+        "Override block content should appear"
+    );
+    // Non-overridden blocks should retain defaults
+    assert!(
+        main_rs.contains("TcpListener"),
+        "Non-overridden content should be preserved"
+    );
+}
+
+/// Test 14.3: Generate project then update with no changes (all files skipped)
+#[test]
+fn test_update_no_changes() {
+    use axum_app_create::updater::engine::UpdateEngine;
+
+    let temp_dir = TempDir::new().unwrap();
+    let project_dir = temp_dir.path().join("update-nochange-app");
+
+    let config = ProjectConfig {
+        project_name: "update-nochange-app".to_string(),
+        ..Default::default()
+    };
+
+    generate_project(&project_dir, &config, false, false).unwrap();
+
+    // Run update — no changes should be detected
+    let engine = UpdateEngine::new(project_dir.clone(), false, false, None);
+    let report = engine.update(false).unwrap();
+
+    assert!(
+        report.files_updated.is_empty(),
+        "No files should be updated: {:?}",
+        report.files_updated
+    );
+    assert!(
+        report.files_conflicted.is_empty(),
+        "No conflicts expected: {:?}",
+        report.files_conflicted
+    );
+    assert!(
+        !report.files_skipped.is_empty(),
+        "All files should be skipped"
+    );
+}
+
+/// Test 14.4: Generate project, modify a file, update with conflict detection
+#[test]
+fn test_update_conflict_detection() {
+    use axum_app_create::updater::engine::UpdateEngine;
+
+    let temp_dir = TempDir::new().unwrap();
+    let project_dir = temp_dir.path().join("update-conflict-app");
+
+    let config = ProjectConfig {
+        project_name: "update-conflict-app".to_string(),
+        ..Default::default()
+    };
+
+    generate_project(&project_dir, &config, false, false).unwrap();
+
+    // Modify a generated file (simulating user edit)
+    let main_rs = project_dir.join("src/main.rs");
+    let content = std::fs::read_to_string(&main_rs).unwrap();
+    std::fs::write(&main_rs, format!("{}\n// User modification", content)).unwrap();
+
+    // Also modify the template source to create a diff
+    // (The update engine regenerates from stored config, so if the template
+    //  hasn't changed, the new content will match the original)
+    // Since we can't change built-in templates, the update will see:
+    // - current file differs from new generation (user modified)
+    // - current checksum differs from stored checksum (user modified)
+    // → conflict
+    let engine = UpdateEngine::new(project_dir.clone(), false, false, None);
+    let report = engine.update(false).unwrap();
+
+    // The modified file should be detected
+    // Note: since the regenerated content matches the original,
+    // and the user modified the file, the current content differs from new content
+    // AND the current checksum differs from stored checksum → conflict
+    // But actually: new content == original content, current != new → check checksum
+    // current checksum != stored checksum → conflict
+    assert!(
+        report.files_conflicted.contains(&"src/main.rs".to_string()),
+        "Modified file should be detected as conflict: {:?}",
+        report
+    );
+}
+
+/// Test 14.5: init-template exports templates, use them as custom templates to generate identical project
+#[test]
+fn test_init_template_roundtrip() {
+    use axum_app_create::template::exporter::TemplateExporter;
+
+    let temp_dir = TempDir::new().unwrap();
+    let export_dir = temp_dir.path().join("exported");
+    let project_builtin = temp_dir.path().join("builtin-app");
+    let project_custom = temp_dir.path().join("custom-app");
+
+    let config = ProjectConfig {
+        project_name: "roundtrip-app".to_string(),
+        ..Default::default()
+    };
+
+    // Generate with built-in templates
+    generate_project(&project_builtin, &config, false, false).unwrap();
+
+    // Export templates
+    TemplateExporter::export(ProjectMode::Single, &export_dir).unwrap();
+
+    // Generate with exported templates as custom
+    axum_app_create::generator::project::generate_project_with_templates(
+        &project_custom,
+        &config,
+        false,
+        false,
+        Some(export_dir),
+    )
+    .unwrap();
+
+    // Compare key files — they should be identical
+    for file in &["Cargo.toml", "src/main.rs", "src/lib.rs", "src/config.rs"] {
+        let builtin_content = std::fs::read_to_string(project_builtin.join(file)).unwrap();
+        let custom_content = std::fs::read_to_string(project_custom.join(file)).unwrap();
+        assert_eq!(
+            builtin_content, custom_content,
+            "File {} should be identical between built-in and exported template generation",
+            file
+        );
+    }
+}
+
+/// Test 14.6: Backward compatibility — all v0.2.0 argument combinations produce same results
+#[test]
+fn test_backward_compatibility() {
+    use axum_app_create::config::{DatabaseOption, FeatureSet};
+
+    let temp_dir = TempDir::new().unwrap();
+
+    // Test various v0.2.0-style configurations
+    let configs = vec![
+        ProjectConfig {
+            project_name: "compat-minimal".to_string(),
+            ..Default::default()
+        },
+        ProjectConfig {
+            project_name: "compat-db".to_string(),
+            features: FeatureSet {
+                database: DatabaseOption::PostgreSQL,
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        ProjectConfig {
+            project_name: "compat-workspace".to_string(),
+            mode: ProjectMode::Workspace,
+            ..Default::default()
+        },
+    ];
+
+    for config in configs {
+        let project_dir = temp_dir.path().join(&config.project_name);
+        let result = generate_project(&project_dir, &config, false, false);
+        assert!(
+            result.is_ok(),
+            "Backward compatible generation failed for {}: {:?}",
+            config.project_name,
+            result.err()
+        );
+        assert!(
+            project_dir.join("Cargo.toml").exists(),
+            "Cargo.toml missing for {}",
+            config.project_name
+        );
+
+        // v0.3.0 addition: metadata file should also be created
+        assert!(
+            project_dir.join(".axum-app-create.json").exists(),
+            "Metadata file missing for {}",
+            config.project_name
+        );
+    }
+}

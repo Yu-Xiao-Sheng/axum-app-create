@@ -6,6 +6,7 @@ description = "{{description}}"
 authors = ["{{author_name}}"]
 
 [dependencies]
+{{#block "dependencies"}}
 axum = "0.8"
 tokio = { version = "1", features = ["full"] }
 tracing = "0.1"
@@ -26,9 +27,12 @@ bcrypt = "0.18"
 {{#if has_biz_error}}
 biz-error = { version = "0.1", features = ["codegen"] }
 {{/if}}
+{{/block}}
 
 [dev-dependencies]
+{{#block "dev_dependencies"}}
 tokio-test = "0.4"
+{{/block}}
 
 {{#if has_biz_error}}
 [build-dependencies]

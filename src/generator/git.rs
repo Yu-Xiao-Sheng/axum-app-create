@@ -32,10 +32,12 @@ pub fn init_git_repo(project_dir: &Path) -> Result<()> {
         }
     };
 
-    // Create .gitignore
+    // Create .gitignore only if not already present (template system may have created it)
     let gitignore_path = project_dir.join(".gitignore");
-    let gitignore_content = get_gitignore_content();
-    std::fs::write(&gitignore_path, gitignore_content)?;
+    if !gitignore_path.exists() {
+        let gitignore_content = get_gitignore_content();
+        std::fs::write(&gitignore_path, gitignore_content)?;
+    }
 
     // Add all files to index
     let mut index = match repo.index() {

@@ -125,9 +125,58 @@ impl Default for TemplateEngine {
     }
 }
 
+use handlebars::Renderable;
+
+/// Block helper: renders default content in normal mode.
+/// During inheritance, InheritanceProcessor replaces blocks before Handlebars renders.
+struct BlockHelper;
+
+impl handlebars::HelperDef for BlockHelper {
+    fn call<'reg: 'rc, 'rc>(
+        &self,
+        h: &handlebars::Helper<'rc>,
+        r: &'reg handlebars::Handlebars<'reg>,
+        ctx: &'rc handlebars::Context,
+        rc: &mut handlebars::RenderContext<'reg, 'rc>,
+        out: &mut dyn handlebars::Output,
+    ) -> handlebars::HelperResult {
+        if let Some(template) = h.template() {
+            template.render(r, ctx, rc, out)?;
+        }
+        Ok(())
+    }
+}
+
+/// Override helper: no-op during normal rendering.
+/// Override blocks are processed by InheritanceProcessor before Handlebars renders.
+struct OverrideHelper;
+
+impl handlebars::HelperDef for OverrideHelper {
+    fn call<'reg: 'rc, 'rc>(
+        &self,
+        _h: &handlebars::Helper<'rc>,
+        _r: &'reg handlebars::Handlebars<'reg>,
+        _ctx: &'rc handlebars::Context,
+        _rc: &mut handlebars::RenderContext<'reg, 'rc>,
+        _out: &mut dyn handlebars::Output,
+    ) -> handlebars::HelperResult {
+        Ok(())
+    }
+}
+
 /// Register custom Handlebars helpers
 fn register_custom_helpers(handlebars: &mut Handlebars) {
     use handlebars::{Output, RenderErrorReason};
+
+    // Helper: block
+    // In normal rendering (no inheritance), just renders the default content inside the block.
+    // During inheritance, InheritanceProcessor handles block replacement before Handlebars renders.
+    handlebars.register_helper("block", Box::new(BlockHelper));
+
+    // Helper: override
+    // This is a no-op during normal Handlebars rendering.
+    // Override blocks are processed by InheritanceProcessor before rendering.
+    handlebars.register_helper("override", Box::new(OverrideHelper));
 
     // Helper: to_snake_case
     // Converts a string to snake_case
@@ -246,5 +295,51 @@ mod tests {
         let engine = TemplateEngine::new();
         // Basic test - just ensure it doesn't panic
         assert!(engine.handlebars.strict_mode());
+    }
+}
+
+#[cfg(test)]
+mod block_proptests {
+    use super::*;
+    use crate::config::ProjectConfig;
+    use crate::template::context::TemplateContext;
+    use proptest::prelude::*;
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(100))]
+
+        /// Property 4: Block refactoring backward compatibility
+        /// Rendering a template with {{#block}} markers produces identical output
+        /// to rendering the same content without block markers.
+        /// Feature: v030-template-and-update, Property 4: Block refactoring backward compatibility
+        /// **Validates: Requirements 3.4, 9.1, 9.2, 9.4**
+        #[test]
+        fn prop_block_helper_is_transparent(content in "[a-zA-Z0-9 ;:=()]{1,80}") {
+            // Ensure content doesn't contain Handlebars syntax
+            prop_assume!(!content.contains("{{"));
+            prop_assume!(!content.contains("}}"));
+            // Ensure content has actual non-whitespace characters
+            prop_assume!(content.trim().len() > 0);
+
+            let engine = TemplateEngine::new();
+            let config = ProjectConfig::default();
+            let ctx = TemplateContext::from_config(&config);
+
+            // Render without block markers
+            let without_blocks = engine
+                .render_template("test_no_block", &content, &ctx)
+                .unwrap();
+
+            // Render with block markers wrapping the same content
+            let with_blocks = format!("{{{{#block \"test\"}}}}{}{{{{/block}}}}", content);
+            let with_blocks_result = engine
+                .render_template("test_with_block", &with_blocks, &ctx)
+                .unwrap();
+
+            prop_assert_eq!(
+                without_blocks, with_blocks_result,
+                "Block helper should be transparent"
+            );
+        }
     }
 }

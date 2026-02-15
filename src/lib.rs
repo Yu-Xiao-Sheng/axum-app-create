@@ -7,4 +7,5 @@ pub mod config;
 pub mod error;
 pub mod generator;
 pub mod template;
+pub mod updater;
 pub mod utils;

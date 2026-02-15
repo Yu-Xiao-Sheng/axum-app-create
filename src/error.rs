@@ -22,6 +22,9 @@ pub enum CliError {
     #[error("Git error: {0}")]
     Git(String),
 
+    #[error("Config error: {0}")]
+    Config(String),
+
     #[error("Toolchain error: {0}")]
     ToolchainError(String),
 

@@ -26,3 +26,6 @@ Thumbs.db
 *.db
 *.sqlite
 *.sqlite3
+
+# axum-app-create metadata
+.axum-app-create.json

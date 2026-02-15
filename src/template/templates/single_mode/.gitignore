@@ -28,3 +28,6 @@ Thumbs.db
 *.sqlite
 *.sqlite3
 {{/if}}
+
+# axum-app-create metadata
+.axum-app-create.json
