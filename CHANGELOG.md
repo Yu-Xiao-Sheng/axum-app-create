@@ -13,10 +13,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Planned / 计划中
-- Custom template system / 自定义模板系统
-- Template inheritance / 模板继承
-- Project update mechanism / 项目更新机制
 - Plugin system / 插件系统
+- Template marketplace / 模板市场
+- GitLab CI integration / GitLab CI 集成
+- Deployment helpers / 部署助手
+
+---
+
+## [0.3.0] - 2026-02-15
+
+### Added / 新增
+
+#### Custom Template System / 自定义模板系统
+- `--template-dir <PATH>` flag to load custom templates from external directories / 从外部目录加载自定义模板
+- `CustomTemplateLoader` module for recursive `.hbs` file scanning / 递归扫描 `.hbs` 文件的自定义模板加载器
+- `TemplateResolver` module for merging built-in and custom templates with priority / 合并内置和自定义模板的模板解析器
+- `init-template` subcommand to export built-in templates for customization / 导出内置模板的子命令
+- `TemplateExporter` module for writing built-in templates to filesystem / 将内置模板写入文件系统
+
+#### Template Inheritance / 模板继承
+- `InheritanceProcessor` module with `extends`/`block`/`override` directive support / 支持 extends/block/override 指令的继承处理器
+- `{{!-- extends: <base_template_path> --}}` directive for child templates / 子模板的 extends 指令
+- `{{#block "name"}}...{{/block}}` for defining overridable blocks in base templates / 基础模板中定义可覆盖块
+- `{{#override "name"}}...{{/override}}` for replacing block content in child templates / 子模板中替换块内容
+- Built-in templates refactored with blocks: `imports`, `config`, `routes`, `middleware`, `main_body`, `dependencies`, `dev_dependencies` / 内置模板重构添加块定义
+
+#### Project Update Mechanism / 项目更新机制
+- `update` subcommand to re-apply templates to existing projects / 更新已生成项目的子命令
+- `UpdateEngine` with dry-run and force modes / 支持 dry-run 和 force 模式的更新引擎
+- `GenerationMetadata` (`.axum-app-create.json`) for tracking project generation state / 跟踪项目生成状态的元数据
+- `ChecksumCalculator` with SHA-256 for user modification detection / 使用 SHA-256 检测用户修改
+- File classification: skip, auto-update, conflict, new / 文件分类：跳过、自动更新、冲突、新增
+
+#### User Configuration / 用户配置
+- `~/.axum-app-create.toml` user-level configuration file support / 用户级配置文件支持
+- `UserConfig` module with TOML parsing and graceful fallback / TOML 解析和优雅降级
+- Configuration priority: CLI flags > user config > defaults / 配置优先级：CLI 标志 > 用户配置 > 默认值
+
+#### CLI Improvements / CLI 改进
+- Subcommand architecture: `new`, `init-template`, `update` / 子命令架构
+- Backward compatible: no subcommand defaults to `new` / 向后兼容：无子命令默认为 new
+
+#### Testing / 测试
+- 13 property-based tests with `proptest` covering template resolution, inheritance, checksums, update logic, metadata serialization, and configuration priority / 13 个属性测试
+- 34 integration tests (up from 22) / 34 个集成测试（从 22 个增加）
+- 100 unit tests (up from 56) / 100 个单元测试（从 56 个增加）
+- Total: 137 tests passing / 共计：137 个测试通过
+
+### Changed / 更改
+- Version bumped to 0.3.0 / 版本升级到 0.3.0
+- CLI argument parsing moved to subcommand-based architecture / CLI 参数解析改为子命令架构
+- Generator now creates `.axum-app-create.json` metadata and adds it to `.gitignore` / 生成器现在创建元数据文件
+- Built-in templates refactored with block definitions (backward compatible) / 内置模板重构添加块定义（向后兼容）
 
 ---
 

@@ -35,6 +35,10 @@
 - ✅ **Workspace Mode / 工作区模式**: Generate multi-crate workspace projects (Clean Architecture) / 生成多 crate 工作区项目（分层架构）
 - ✅ **Configuration Presets / 配置预设**: Quick setup with `--preset minimal/api/fullstack` / 使用预设快速配置
 - ✅ **CI/CD Integration / CI/CD 集成**: Generate GitHub Actions workflow with `--ci` / 生成 GitHub Actions 工作流
+- ✅ **Custom Templates / 自定义模板**: Override or extend built-in templates with `--template-dir` / 使用自定义模板覆盖或扩展内置模板
+- ✅ **Template Inheritance / 模板继承**: Extend base templates with `extends`/`block`/`override` directives / 通过继承指令扩展基础模板
+- ✅ **Project Update / 项目更新**: Update existing projects with `axum-app-create update` / 使用 update 子命令更新已有项目
+- ✅ **User Configuration / 用户配置**: Default settings via `~/.axum-app-create.toml` / 通过用户配置文件设置默认值
 - ✅ **Interactive Prompts / 交互式提示**: Friendly CLI with interactive configuration / 友好的交互式配置界面
 - ✅ **Sensible Defaults / 合理默认值**: Works out of the box with zero configuration / 开箱即用，零配置
 - ✅ **Production-Ready Templates / 生产就绪模板**: Includes tracing, error handling, proper structure / 包含日志、错误处理、规范结构
@@ -166,8 +170,16 @@ curl http://127.0.0.1:8080/health
 ### Full Usage / 完整用法
 
 ```bash
-axum-app-create [OPTIONS] [PROJECT_NAME]
+axum-app-create [COMMAND] [OPTIONS] [PROJECT_NAME]
 ```
+
+### Subcommands / 子命令
+
+| Command / 命令 | Description / 描述 |
+|----------------|-------------------|
+| `new` | Create a new project (default if no subcommand) / 创建新项目（默认） |
+| `init-template` | Export built-in templates for customization / 导出内置模板 |
+| `update` | Update a previously generated project / 更新已生成的项目 |
 
 ### Options / 选项
 
@@ -184,6 +196,7 @@ axum-app-create [OPTIONS] [PROJECT_NAME]
 | `--author <NAME>` | Author name for generated project / 项目作者名称 | Git config / Git 配置 |
 | `--force` | Force overwrite if target directory exists / 强制覆盖已存在的目录 | `false` |
 | `--non-interactive` | Disable prompts / 禁用交互提示 (fail if required values missing / 缺少必需值时失败) | `false` |
+| `--template-dir <DIR>` | Custom template directory / 自定义模板目录 | None |
 | `--help`, `-h` | Show help message / 显示帮助信息 | - |
 | `--version`, `-V` | Show version / 显示版本 | - |
 
@@ -219,6 +232,14 @@ axum-app-create myapp \
   --preset fullstack \
   --ci \
   --author "Your Name"
+
+# Custom templates (v0.3.0) / 自定义模板
+axum-app-create init-template ./my-templates --mode single
+axum-app-create new myapp --template-dir ./my-templates
+
+# Update existing project (v0.3.0) / 更新已有项目
+axum-app-create update ./myapp --dry-run
+axum-app-create update ./myapp --force
 ```
 
 ---
@@ -463,9 +484,9 @@ https://github.com/Yu-Xiao-Sheng/axum-app-create/issues
 - [x] Workspace mode (multi-package projects) / 工作区模式（多包项目）
 - [x] Interactive configuration presets / 交互式配置预设
 - [x] CI/CD integration (GitHub Actions) / CI/CD 集成（GitHub Actions）
-- [ ] Custom template system / 自定义模板系统
-- [ ] Template inheritance / 模板继承
-- [ ] Project update mechanism / 项目更新机制
+- [x] Custom template system / 自定义模板系统
+- [x] Template inheritance / 模板继承
+- [x] Project update mechanism / 项目更新机制
 
 ### Phase 3: Ecosystem Integration 🔮 (Future / 未来)
 
@@ -559,9 +580,9 @@ Built with great open-source tools:
 
 ---
 
-**Current Version / 当前版本**: 0.2.0
+**Current Version / 当前版本**: 0.3.0
 
-**Status / 状态**: Phase 2 Enhanced Features Complete / Phase 2 增强功能已完成 ✅
+**Status / 状态**: v0.3.0 Custom Template & Update Complete / v0.3.0 自定义模板与更新机制已完成 ✅
 
 **Year / 年份**: 2026
 
