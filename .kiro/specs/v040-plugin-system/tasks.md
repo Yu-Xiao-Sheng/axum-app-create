@@ -8,51 +8,51 @@ This plan breaks down the v0.4.0 Plugin System into incremental coding tasks. Ea
 
 ## Tasks
 
-- [ ] 1. Add new dependencies and set up plugin module structure
-  - [ ] 1.1 Update `Cargo.toml`: bump version to `0.4.0`, add `semver = "1"`
+- [x] 1. Add new dependencies and set up plugin module structure
+  - [x] 1.1 Update `Cargo.toml`: bump version to `0.4.0`, add `semver = "1"`
     - _Requirements: 9.6_
-  - [ ] 1.2 Create `src/plugin/mod.rs` with submodule declarations (manifest, registry, loader, dependency, hooks, sandbox, manager)
+  - [x] 1.2 Create `src/plugin/mod.rs` with submodule declarations (manifest, registry, loader, dependency, hooks, sandbox, manager)
     - Create empty stub files for each submodule
     - Add `pub mod plugin;` to `src/lib.rs`
     - _Requirements: 1.1_
-  - [ ] 1.3 Add `Plugin(String)` variant to `CliError` in `src/error.rs`
+  - [x] 1.3 Add `Plugin(String)` variant to `CliError` in `src/error.rs`
     - _Requirements: 1.5_
 
-- [ ] 2. Implement plugin manifest parser
-  - [ ] 2.1 Create `src/plugin/manifest.rs` with `PluginManifest`, `PluginCapabilities`, `PluginCommandDef`, `PluginPermissions` structs
+- [x] 2. Implement plugin manifest parser
+  - [x] 2.1 Create `src/plugin/manifest.rs` with `PluginManifest`, `PluginCapabilities`, `PluginCommandDef`, `PluginPermissions` structs
     - Implement `ManifestParser::parse()`, `ManifestParser::serialize()`, `ManifestParser::validate()`, `ManifestParser::load_from_dir()`
     - Use `serde` derive for TOML serialization/deserialization
     - Validate required fields: `name`, `version`, `description`, `min_tool_version`
     - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8_
-  - [ ]* 2.2 Write property test for manifest serialization round-trip
+  - [x]* 2.2 Write property test for manifest serialization round-trip
     - **Property 1: Plugin manifest serialization round-trip**
     - Generate random PluginManifest structs, serialize to TOML then deserialize, verify equivalence
     - **Validates: Requirements 1.7, 1.8, 1.9**
-  - [ ]* 2.3 Write property test for required field validation
+  - [x]* 2.3 Write property test for required field validation
     - **Property 2: Plugin manifest required field validation**
     - Generate TOML strings missing various required fields, verify parse returns appropriate errors
     - **Validates: Requirements 1.2, 1.5**
 
-- [ ] 3. Implement plugin registry
-  - [ ] 3.1 Create `src/plugin/registry.rs` with `PluginEntry`, `PluginSource`, `PluginRegistry` structs
+- [x] 3. Implement plugin registry
+  - [x] 3.1 Create `src/plugin/registry.rs` with `PluginEntry`, `PluginSource`, `PluginRegistry` structs
     - Implement `load()`, `save()`, `add()`, `remove()`, `find()`, `find_mut()`, `enabled_plugins()`
     - Registry file path: `~/.axum-app-create/plugins.toml`
     - _Requirements: 3.7, 3.8, 3.10_
-  - [ ]* 3.2 Write property test for registry round-trip and invariants
+  - [x]* 3.2 Write property test for registry round-trip and invariants
     - **Property 4: Plugin registry round-trip and invariants**
     - Generate random add/remove operation sequences, verify state consistency and serialization round-trip
     - **Validates: Requirements 3.7, 3.8, 3.10**
 
-- [ ] 4. Implement version compatibility checker
-  - [ ] 4.1 Add version compatibility check function using `semver` crate in `src/plugin/loader.rs`
+- [x] 4. Implement version compatibility checker
+  - [x] 4.1 Add version compatibility check function using `semver` crate in `src/plugin/loader.rs`
     - Implement `PluginLoader::check_compatibility()` comparing `min_tool_version` with current tool version
     - _Requirements: 2.7, 2.8_
-  - [ ]* 4.2 Write property test for version compatibility
+  - [x]* 4.2 Write property test for version compatibility
     - **Property 3: Version compatibility check**
     - Generate random semver pairs, verify compatibility logic
     - **Validates: Requirements 2.7, 2.8**
 
-- [ ] 5. Checkpoint - Ensure all tests pass
+- [x] 5. Checkpoint - Ensure all tests pass
   - Ensure all tests pass (including existing tests), ask the user if questions arise.
 
 - [ ] 6. Implement dependency resolver

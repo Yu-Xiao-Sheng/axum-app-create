@@ -6,6 +6,7 @@ pub mod cli;
 pub mod config;
 pub mod error;
 pub mod generator;
+pub mod plugin;
 pub mod template;
 pub mod updater;
 pub mod utils;
