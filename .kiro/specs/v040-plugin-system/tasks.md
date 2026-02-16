@@ -55,52 +55,52 @@ This plan breaks down the v0.4.0 Plugin System into incremental coding tasks. Ea
 - [x] 5. Checkpoint - Ensure all tests pass
   - Ensure all tests pass (including existing tests), ask the user if questions arise.
 
-- [ ] 6. Implement dependency resolver
-  - [ ] 6.1 Create `src/plugin/dependency.rs` with `DependencyResolver` struct
+- [x] 6. Implement dependency resolver
+  - [x] 6.1 Create `src/plugin/dependency.rs` with `DependencyResolver` struct
     - Implement `resolve()` using Kahn's algorithm for topological sort
     - Implement `detect_cycle()` using DFS cycle detection
     - Implement `validate_dependencies()` for checking installed deps and version compatibility
     - _Requirements: 8.1, 8.3, 8.4, 8.5_
-  - [ ]* 6.2 Write property test for circular dependency detection
+  - [x]* 6.2 Write property test for circular dependency detection
     - **Property 11: Circular dependency detection**
     - Generate random directed graphs (with and without cycles), verify detection correctness
     - **Validates: Requirements 8.3**
-  - [ ]* 6.3 Write property test for topological sort correctness
+  - [x]* 6.3 Write property test for topological sort correctness
     - **Property 12: Dependency topological sort correctness**
     - Generate random DAGs, verify every plugin appears after its dependencies
     - **Validates: Requirements 8.1, 8.4**
 
-- [ ] 7. Implement hook executor
-  - [ ] 7.1 Create `src/plugin/hooks.rs` with `HookPoint`, `PluginContext`, `HookResult`, `HookExecutor` structs
+- [x] 7. Implement hook executor
+  - [x] 7.1 Create `src/plugin/hooks.rs` with `HookPoint`, `PluginContext`, `HookResult`, `HookExecutor` structs
     - Implement `execute()` to run hooks in priority order
     - Implement `sort_by_priority()` for ordering plugins
     - Hook errors are recorded but don't interrupt the pipeline
     - _Requirements: 4.1, 4.2, 4.3, 4.6, 4.7, 4.8, 4.9_
-  - [ ]* 7.2 Write property test for hook priority ordering
+  - [x]* 7.2 Write property test for hook priority ordering
     - **Property 6: Hook priority ordering**
     - Generate random priority values, verify execution order
     - **Validates: Requirements 4.2, 4.3, 4.7**
-  - [ ]* 7.3 Write property test for modify_context invariant
+  - [x]* 7.3 Write property test for modify_context invariant
     - **Property 7: modify_context only adds, never removes**
     - Generate random initial contexts and additions, verify originals preserved
     - **Validates: Requirements 4.4**
-  - [ ]* 7.4 Write property test for error resilience
+  - [x]* 7.4 Write property test for error resilience
     - **Property 8: Hook errors do not interrupt pipeline**
     - Generate plugin sets with some returning errors, verify all plugins invoked
     - **Validates: Requirements 4.8**
 
-- [ ] 8. Implement plugin sandbox
-  - [ ] 8.1 Create `src/plugin/sandbox.rs` with `PluginSandbox` struct
+- [x] 8. Implement plugin sandbox
+  - [x] 8.1 Create `src/plugin/sandbox.rs` with `PluginSandbox` struct
     - Implement `validate_path()` to check paths against project dir and plugin dir whitelist
     - Implement `check_permissions()` for permission validation
     - Implement `confirm_permissions()` for interactive permission confirmation
     - _Requirements: 11.2, 11.3, 11.4, 11.5_
-  - [ ]* 8.2 Write property test for sandbox path validation
+  - [x]* 8.2 Write property test for sandbox path validation
     - **Property 13: Filesystem sandbox path validation**
     - Generate random paths, verify only project-dir and plugin-dir paths are allowed
     - **Validates: Requirements 11.2, 11.3**
 
-- [ ] 9. Checkpoint - Ensure all tests pass
+- [x] 9. Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
 - [ ] 10. Implement plugin loader
