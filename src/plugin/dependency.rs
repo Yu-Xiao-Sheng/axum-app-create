@@ -37,7 +37,9 @@ impl DependencyResolver {
         for (name, manifest) in plugins {
             for dep_name in manifest.dependencies.keys() {
                 if plugins.contains_key(dep_name) {
-                    adj.entry(dep_name.as_str()).or_default().push(name.as_str());
+                    adj.entry(dep_name.as_str())
+                        .or_default()
+                        .push(name.as_str());
                     *in_degree.entry(name.as_str()).or_insert(0) += 1;
                 }
             }
@@ -90,12 +92,11 @@ impl DependencyResolver {
         names.sort(); // deterministic order
 
         for name in names {
-            if !visited.contains(name.as_str()) {
-                if let Some(cycle) =
+            if !visited.contains(name.as_str())
+                && let Some(cycle) =
                     Self::dfs_cycle(name, plugins, &mut visited, &mut rec_stack, &mut path)
-                {
-                    return Some(cycle);
-                }
+            {
+                return Some(cycle);
             }
         }
         None
@@ -159,23 +160,22 @@ impl DependencyResolver {
                 }
                 Some(dep_manifest) => {
                     // Parse version requirement and check compatibility
-                    if let Ok(req) = semver::VersionReq::parse(version_req) {
-                        if let Ok(ver) = semver::Version::parse(&dep_manifest.version) {
-                            if !req.matches(&ver) {
-                                return Err(CliError::Plugin(format!(
-                                    "Plugin '{}' requires '{}' {}, but installed version is {} / \
+                    if let Ok(req) = semver::VersionReq::parse(version_req)
+                        && let Ok(ver) = semver::Version::parse(&dep_manifest.version)
+                        && !req.matches(&ver)
+                    {
+                        return Err(CliError::Plugin(format!(
+                            "Plugin '{}' requires '{}' {}, but installed version is {} / \
                                      插件 '{}' 要求 '{}' {}，但已安装版本为 {}",
-                                    plugin.name,
-                                    dep_name,
-                                    version_req,
-                                    dep_manifest.version,
-                                    plugin.name,
-                                    dep_name,
-                                    version_req,
-                                    dep_manifest.version
-                                )));
-                            }
-                        }
+                            plugin.name,
+                            dep_name,
+                            version_req,
+                            dep_manifest.version,
+                            plugin.name,
+                            dep_name,
+                            version_req,
+                            dep_manifest.version
+                        )));
                     }
                 }
             }

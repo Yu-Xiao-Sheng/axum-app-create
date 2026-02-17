@@ -54,9 +54,7 @@ impl PluginRegistry {
     /// Get the registry file path
     fn registry_path() -> Result<PathBuf> {
         let home = dirs::home_dir().ok_or_else(|| {
-            CliError::Plugin(
-                "Cannot determine home directory / 无法确定主目录".to_string(),
-            )
+            CliError::Plugin("Cannot determine home directory / 无法确定主目录".to_string())
         })?;
         Ok(home.join(".axum-app-create").join("plugins.toml"))
     }
@@ -142,16 +140,14 @@ impl PluginRegistry {
 
     /// Serialize registry to TOML string (for testing)
     pub fn to_toml(&self) -> Result<String> {
-        toml::to_string_pretty(self).map_err(|e| {
-            CliError::Plugin(format!("Failed to serialize registry: {}", e))
-        })
+        toml::to_string_pretty(self)
+            .map_err(|e| CliError::Plugin(format!("Failed to serialize registry: {}", e)))
     }
 
     /// Deserialize registry from TOML string (for testing)
     pub fn from_toml(content: &str) -> Result<Self> {
-        toml::from_str(content).map_err(|e| {
-            CliError::Plugin(format!("Failed to parse registry: {}", e))
-        })
+        toml::from_str(content)
+            .map_err(|e| CliError::Plugin(format!("Failed to parse registry: {}", e)))
     }
 }
 

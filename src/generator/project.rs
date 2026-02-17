@@ -45,6 +45,24 @@ pub fn generate_project_with_templates(
     force: bool,
     template_dir: Option<PathBuf>,
 ) -> Result<()> {
+    use crate::plugin::hooks::{HookPoint, PluginContext};
+    use crate::plugin::manager::PluginManager;
+
+    // Initialize plugin system (graceful degradation on failure)
+    let mut plugin_manager = PluginManager::try_new();
+
+    // Load enabled plugins
+    if let Some(ref mut mgr) = plugin_manager
+        && let Err(e) = mgr.load_enabled()
+    {
+        tracing::warn!(
+            "Failed to load plugins, continuing without plugins / \
+                 加载插件失败，以无插件模式继续: {}",
+            e
+        );
+        plugin_manager = None;
+    }
+
     // Validate project directory doesn't exist
     if project_dir.exists() {
         // --force flag: delete and recreate
@@ -130,9 +148,72 @@ pub fn generate_project_with_templates(
     // Create template engine
     let engine = TemplateEngine::new();
 
-    // Resolve templates (built-in + optional custom templates)
+    // Execute pre_generate hook
+    let mut plugin_context = plugin_manager.as_ref().map(|_| PluginContext {
+        tool_version: env!("CARGO_PKG_VERSION").to_string(),
+        project_dir: project_dir.to_path_buf(),
+        plugin_config: toml::Value::Table(toml::map::Map::new()),
+        plugin_dir: PathBuf::new(),
+    });
+
+    if let (Some(mgr), Some(pctx)) = (&plugin_manager, &mut plugin_context) {
+        let results = mgr.execute_hook(HookPoint::PreGenerate, pctx);
+        for r in &results {
+            if !r.success {
+                tracing::warn!(
+                    "Plugin '{}' pre_generate hook failed: {} / 插件 '{}' pre_generate 钩子失败",
+                    r.plugin_name,
+                    r.error.as_deref().unwrap_or("unknown"),
+                    r.plugin_name
+                );
+            }
+        }
+    }
+
+    // Execute modify_context hook to extend template context
+    if let (Some(mgr), Some(pctx)) = (&plugin_manager, &mut plugin_context) {
+        let results = mgr.execute_hook(HookPoint::ModifyContext, pctx);
+        for r in &results {
+            if r.success && !r.context_additions.is_empty() {
+                tracing::info!(
+                    "Plugin '{}' added {} context variables / 插件 '{}' 添加了 {} 个上下文变量",
+                    r.plugin_name,
+                    r.context_additions.len(),
+                    r.plugin_name,
+                    r.context_additions.len()
+                );
+            }
+        }
+    }
+
+    // Collect plugin templates
+    let plugin_templates = plugin_manager
+        .as_ref()
+        .map(|mgr| mgr.get_plugin_templates())
+        .unwrap_or_default();
+
+    // Execute modify_templates hook
+    let mut extra_templates = std::collections::HashMap::new();
+    if let (Some(mgr), Some(pctx)) = (&plugin_manager, &mut plugin_context) {
+        let results = mgr.execute_hook(HookPoint::ModifyTemplates, pctx);
+        for r in &results {
+            if r.success {
+                extra_templates.extend(r.template_additions.clone());
+            }
+        }
+    }
+
+    // Merge hook template additions with plugin templates
+    let mut all_plugin_templates = plugin_templates;
+    all_plugin_templates.extend(extra_templates);
+
+    // Resolve templates (built-in + plugin + optional custom templates)
     let resolver = TemplateResolver::new(template_dir);
-    let resolved = resolver.resolve(config.mode, config.ci)?;
+    let resolved = if all_plugin_templates.is_empty() {
+        resolver.resolve(config.mode, config.ci)?
+    } else {
+        resolver.resolve_with_plugins(config.mode, config.ci, &all_plugin_templates)?
+    };
 
     // Render and write each template
     println!("\n📝 Generating files:");
@@ -177,6 +258,21 @@ pub fn generate_project_with_templates(
         }
         _ => {
             println!("  ⚠ Could not update dependencies, run `cargo update` manually");
+        }
+    }
+
+    // Execute post_generate hook
+    if let (Some(mgr), Some(pctx)) = (&plugin_manager, &mut plugin_context) {
+        let results = mgr.execute_hook(HookPoint::PostGenerate, pctx);
+        for r in &results {
+            if !r.success {
+                tracing::warn!(
+                    "Plugin '{}' post_generate hook failed: {} / 插件 '{}' post_generate 钩子失败",
+                    r.plugin_name,
+                    r.error.as_deref().unwrap_or("unknown"),
+                    r.plugin_name
+                );
+            }
         }
     }
 

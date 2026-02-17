@@ -145,6 +145,102 @@ impl TemplateResolver {
             .map(|(k, v)| (k.to_string(), v.content.to_string()))
             .collect()
     }
+
+    /// Resolve with plugin templates (three-tier merge: built-in → plugin → user custom)
+    /// 使用插件模板解析（三层合并：内置 → 插件 → 用户自定义）
+    pub fn resolve_with_plugins(
+        &self,
+        mode: ProjectMode,
+        ci_enabled: bool,
+        plugin_templates: &HashMap<String, String>,
+    ) -> Result<HashMap<String, ResolvedTemplate>> {
+        // Step 1: Start with normal resolution (built-in + custom)
+        // But we need to insert plugin templates between built-in and custom
+        let mut builtin = match mode {
+            ProjectMode::Single => get_single_mode_templates(),
+            ProjectMode::Workspace => get_workspace_mode_templates(),
+        };
+        if ci_enabled {
+            builtin.extend(get_ci_templates());
+        }
+
+        // Convert built-in to resolved
+        let mut resolved: HashMap<String, ResolvedTemplate> = builtin
+            .into_iter()
+            .map(|(key, tf)| {
+                (
+                    key.to_string(),
+                    ResolvedTemplate {
+                        path: tf.path.to_string(),
+                        content: tf.content.to_string(),
+                        executable: tf.executable,
+                    },
+                )
+            })
+            .collect();
+
+        // Step 2: Merge plugin templates (override built-in, add new)
+        for (key, content) in plugin_templates {
+            let path = resolved
+                .get(key)
+                .map(|t| t.path.clone())
+                .unwrap_or_else(|| key.clone());
+            resolved.insert(
+                key.clone(),
+                ResolvedTemplate {
+                    path,
+                    content: content.clone(),
+                    executable: false,
+                },
+            );
+        }
+
+        // Step 3: Merge user custom templates (highest priority)
+        if let Some(ref custom_dir) = self.custom_template_dir {
+            let custom_templates = CustomTemplateLoader::load(custom_dir)?;
+            let builtin_contents = Self::get_builtin_templates(mode, ci_enabled);
+
+            for (key, content) in custom_templates {
+                if let Some(base_path) = InheritanceProcessor::parse_extends(&content) {
+                    let base_content = builtin_contents.get(&base_path).ok_or_else(|| {
+                        CliError::Template(format!(
+                            "Template inheritance error: base '{}' not found for '{}'",
+                            base_path, key
+                        ))
+                    })?;
+                    let overrides = InheritanceProcessor::parse_overrides(&content);
+                    let merged = InheritanceProcessor::apply_inheritance(base_content, &overrides)?;
+                    let path = resolved
+                        .get(&key)
+                        .map(|t| t.path.clone())
+                        .unwrap_or_else(|| key.clone());
+                    resolved.insert(
+                        key,
+                        ResolvedTemplate {
+                            path,
+                            content: merged,
+                            executable: false,
+                        },
+                    );
+                } else {
+                    let path = resolved
+                        .get(&key)
+                        .map(|t| t.path.clone())
+                        .unwrap_or_else(|| key.clone());
+                    resolved.insert(
+                        key,
+                        ResolvedTemplate {
+                            path,
+                            content,
+                            executable: false,
+                        },
+                    );
+                }
+            }
+        }
+
+        Ok(resolved)
+    }
 }
 
 /// Merge two template sets: custom overrides built-in, new paths are added.
@@ -155,6 +251,26 @@ pub fn merge_template_sets(
 ) -> HashMap<String, String> {
     let mut result = builtin.clone();
     for (key, content) in custom {
+        result.insert(key.clone(), content.clone());
+    }
+    result
+}
+
+/// Three-tier merge: built-in → plugin → user custom.
+/// Priority: user custom > plugin > built-in.
+/// This is a pure function for property testing.
+pub fn merge_three_tier(
+    builtin: &HashMap<String, String>,
+    plugin: &HashMap<String, String>,
+    user_custom: &HashMap<String, String>,
+) -> HashMap<String, String> {
+    let mut result = builtin.clone();
+    // Plugin overrides built-in
+    for (key, content) in plugin {
+        result.insert(key.clone(), content.clone());
+    }
+    // User custom overrides everything
+    for (key, content) in user_custom {
         result.insert(key.clone(), content.clone());
     }
     result

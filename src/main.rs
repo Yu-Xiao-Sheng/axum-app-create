@@ -18,7 +18,7 @@ use std::path::{Path, PathBuf};
 #[derive(Parser, Debug)]
 #[command(name = "axum-app-create")]
 #[command(about = "Scaffold a new Axum web application", long_about = None)]
-#[command(version = "0.3.0")]
+#[command(version = "0.4.0")]
 struct Cli {
     #[command(subcommand)]
     command: Option<Commands>,
@@ -143,6 +143,62 @@ enum Commands {
         #[arg(long, value_name = "DIR")]
         template_dir: Option<PathBuf>,
     },
+    /// 插件管理 / Plugin management
+    Plugin {
+        #[command(subcommand)]
+        action: PluginAction,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum PluginAction {
+    /// 安装插件 / Install a plugin
+    Install {
+        /// 插件来源 / Plugin source (path or git URL)
+        source: String,
+
+        /// 从 Git 仓库安装 / Install from Git repository
+        #[arg(long)]
+        git: bool,
+
+        /// Git revision (branch, tag, or commit)
+        #[arg(long)]
+        rev: Option<String>,
+    },
+    /// 卸载插件 / Uninstall a plugin
+    Uninstall {
+        /// 插件名称 / Plugin name
+        name: String,
+    },
+    /// 启用插件 / Enable a plugin
+    Enable {
+        /// 插件名称 / Plugin name
+        name: String,
+    },
+    /// 禁用插件 / Disable a plugin
+    Disable {
+        /// 插件名称 / Plugin name
+        name: String,
+    },
+    /// 列出已安装插件 / List installed plugins
+    List,
+    /// 显示插件详情 / Show plugin details
+    Info {
+        /// 插件名称 / Plugin name
+        name: String,
+    },
+    /// 运行插件命令 / Run a plugin command
+    Run {
+        /// 插件名称 / Plugin name
+        plugin: String,
+
+        /// 命令名称 / Command name
+        command: String,
+
+        /// 命令参数 / Command arguments
+        #[arg(trailing_var_arg = true)]
+        args: Vec<String>,
+    },
 }
 
 /// Format error message with troubleshooting guidance
@@ -175,7 +231,7 @@ fn main() -> anyhow::Result<()> {
 
     let cli = Cli::parse();
 
-    println!("\n🦀 axum-app-create CLI Tool v0.3.0");
+    println!("\n🦀 axum-app-create CLI Tool v0.4.0");
 
     // Load user configuration file
     let user_config = UserConfig::load();
@@ -191,6 +247,7 @@ fn main() -> anyhow::Result<()> {
             let resolved_dir = resolve_template_dir(template_dir, &user_config);
             run_update(&project_dir, dry_run, force, resolved_dir)
         }
+        Some(Commands::Plugin { action }) => run_plugin_command(action),
         Some(Commands::New {
             project_name,
             author,
@@ -303,6 +360,163 @@ fn run_update(
         Err(e) => {
             eprintln!("\n❌ {}", format_error_message(&e));
             std::process::exit(1);
+        }
+    }
+
+    Ok(())
+}
+
+fn run_plugin_command(action: PluginAction) -> anyhow::Result<()> {
+    use axum_app_create::plugin::manager::PluginManager;
+    use axum_app_create::plugin::registry::PluginSource;
+
+    let interactive = !is_non_interactive(false);
+
+    match action {
+        PluginAction::Install { source, git, rev } => {
+            let mut mgr = PluginManager::new()
+                .map_err(|e| {
+                    eprintln!("\n❌ {}", e);
+                    std::process::exit(1);
+                })
+                .unwrap();
+
+            let plugin_source = if git {
+                PluginSource::Git { url: source, rev }
+            } else {
+                PluginSource::Local {
+                    path: PathBuf::from(&source),
+                }
+            };
+
+            if let Err(e) = mgr.install(plugin_source, interactive) {
+                eprintln!("\n❌ {}", e);
+                std::process::exit(1);
+            }
+        }
+        PluginAction::Uninstall { name } => {
+            let mut mgr = PluginManager::new()
+                .map_err(|e| {
+                    eprintln!("\n❌ {}", e);
+                    std::process::exit(1);
+                })
+                .unwrap();
+
+            if let Err(e) = mgr.uninstall(&name, interactive) {
+                eprintln!("\n❌ {}", e);
+                std::process::exit(1);
+            }
+        }
+        PluginAction::Enable { name } => {
+            let mut mgr = PluginManager::new()
+                .map_err(|e| {
+                    eprintln!("\n❌ {}", e);
+                    std::process::exit(1);
+                })
+                .unwrap();
+
+            if let Err(e) = mgr.enable(&name) {
+                eprintln!("\n❌ {}", e);
+                std::process::exit(1);
+            }
+        }
+        PluginAction::Disable { name } => {
+            let mut mgr = PluginManager::new()
+                .map_err(|e| {
+                    eprintln!("\n❌ {}", e);
+                    std::process::exit(1);
+                })
+                .unwrap();
+
+            if let Err(e) = mgr.disable(&name) {
+                eprintln!("\n❌ {}", e);
+                std::process::exit(1);
+            }
+        }
+        PluginAction::List => {
+            let mgr = PluginManager::new()
+                .map_err(|e| {
+                    eprintln!("\n❌ {}", e);
+                    std::process::exit(1);
+                })
+                .unwrap();
+
+            let plugins = mgr.list();
+            if plugins.is_empty() {
+                println!("\n📦 没有已安装的插件 / No plugins installed");
+                println!(
+                    "💡 使用 `axum-app-create plugin install <PATH>` 安装插件 / Install a plugin"
+                );
+            } else {
+                println!("\n📦 已安装的插件 / Installed plugins:\n");
+                for p in plugins {
+                    let status = if p.enabled { "✅" } else { "⏸️ " };
+                    println!(
+                        "  {} {} v{} ({})",
+                        status,
+                        p.name,
+                        p.version,
+                        if p.enabled {
+                            "enabled / 已启用"
+                        } else {
+                            "disabled / 已禁用"
+                        }
+                    );
+                }
+            }
+        }
+        PluginAction::Info { name } => {
+            let mgr = PluginManager::new()
+                .map_err(|e| {
+                    eprintln!("\n❌ {}", e);
+                    std::process::exit(1);
+                })
+                .unwrap();
+
+            match mgr.info(&name) {
+                Ok(entry) => {
+                    println!("\n📦 插件详情 / Plugin details:\n");
+                    println!("  名称 / Name:      {}", entry.name);
+                    println!("  版本 / Version:    {}", entry.version);
+                    println!(
+                        "  状态 / Status:     {}",
+                        if entry.enabled {
+                            "enabled / 已启用"
+                        } else {
+                            "disabled / 已禁用"
+                        }
+                    );
+                    println!("  安装时间 / Installed: {}", entry.installed_at);
+                    println!("  来源 / Source:     {:?}", entry.source);
+                    println!("  路径 / Path:       {}", entry.install_path.display());
+                }
+                Err(e) => {
+                    eprintln!("\n❌ {}", e);
+                    std::process::exit(1);
+                }
+            }
+        }
+        PluginAction::Run {
+            plugin,
+            command,
+            args,
+        } => {
+            let mut mgr = PluginManager::new()
+                .map_err(|e| {
+                    eprintln!("\n❌ {}", e);
+                    std::process::exit(1);
+                })
+                .unwrap();
+
+            if let Err(e) = mgr.load_enabled() {
+                eprintln!("\n❌ {}", e);
+                std::process::exit(1);
+            }
+
+            if let Err(e) = mgr.run_command(&plugin, &command, &args) {
+                eprintln!("\n❌ {}", e);
+                std::process::exit(1);
+            }
         }
     }
 

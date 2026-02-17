@@ -13,6 +13,9 @@ use std::path::PathBuf;
 pub struct UserConfig {
     /// Default custom template directory path
     pub template_dir: Option<PathBuf>,
+    /// Plugin-specific configuration sections [plugins.<name>]
+    #[serde(default)]
+    pub plugins: std::collections::HashMap<String, toml::Value>,
 }
 
 impl UserConfig {
@@ -76,6 +79,39 @@ pub fn resolve_template_dir(
     cli_flag.or_else(|| user_config.template_dir.clone())
 }
 
+/// Merge plugin configuration: manifest defaults + user overrides.
+/// User config values take priority over manifest defaults.
+/// Warns on unknown config keys (keys in user config not defined in manifest).
+/// 合并插件配置：清单默认值 + 用户覆盖值
+pub fn merge_plugin_config(
+    manifest_defaults: &std::collections::HashMap<String, toml::Value>,
+    user_overrides: &toml::Value,
+) -> toml::Value {
+    let mut merged = toml::map::Map::new();
+
+    // Start with manifest defaults
+    for (key, value) in manifest_defaults {
+        merged.insert(key.clone(), value.clone());
+    }
+
+    // Apply user overrides
+    if let toml::Value::Table(user_table) = user_overrides {
+        for (key, value) in user_table {
+            if !manifest_defaults.contains_key(key) {
+                tracing::warn!(
+                    "Unknown plugin config key '{}', ignoring / 未知的插件配置键 '{}'，已忽略",
+                    key,
+                    key
+                );
+            } else {
+                merged.insert(key.clone(), value.clone());
+            }
+        }
+    }
+
+    toml::Value::Table(merged)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -128,6 +164,7 @@ mod tests {
         let cli = Some(PathBuf::from("/cli/path"));
         let user_config = UserConfig {
             template_dir: Some(PathBuf::from("/config/path")),
+            plugins: Default::default(),
         };
         assert_eq!(
             resolve_template_dir(cli, &user_config),
@@ -139,6 +176,7 @@ mod tests {
     fn test_resolve_template_dir_config_fallback() {
         let user_config = UserConfig {
             template_dir: Some(PathBuf::from("/config/path")),
+            plugins: Default::default(),
         };
         assert_eq!(
             resolve_template_dir(None, &user_config),
@@ -150,6 +188,56 @@ mod tests {
     fn test_resolve_template_dir_none() {
         let user_config = UserConfig::default();
         assert_eq!(resolve_template_dir(None, &user_config), None);
+    }
+
+    #[test]
+    fn test_parse_with_plugin_config() {
+        let toml = r#"
+template_dir = "/home/user/.axum-templates"
+
+[plugins.my-plugin]
+schema_path = "src/schema.rs"
+playground = false
+"#;
+        let config = UserConfig::parse(toml);
+        assert!(config.plugins.contains_key("my-plugin"));
+        let plugin_cfg = &config.plugins["my-plugin"];
+        assert_eq!(
+            plugin_cfg.get("schema_path").and_then(|v| v.as_str()),
+            Some("src/schema.rs")
+        );
+    }
+
+    #[test]
+    fn test_merge_plugin_config() {
+        use std::collections::HashMap;
+        let mut defaults = HashMap::new();
+        defaults.insert(
+            "key1".to_string(),
+            toml::Value::String("default1".to_string()),
+        );
+        defaults.insert("key2".to_string(), toml::Value::Boolean(true));
+
+        let mut user_table = toml::map::Map::new();
+        user_table.insert(
+            "key1".to_string(),
+            toml::Value::String("override1".to_string()),
+        );
+        user_table.insert(
+            "unknown_key".to_string(),
+            toml::Value::String("ignored".to_string()),
+        );
+        let user_overrides = toml::Value::Table(user_table);
+
+        let merged = super::merge_plugin_config(&defaults, &user_overrides);
+        let table = merged.as_table().unwrap();
+
+        // key1 should be overridden
+        assert_eq!(table["key1"].as_str(), Some("override1"));
+        // key2 should keep default
+        assert_eq!(table["key2"].as_bool(), Some(true));
+        // unknown_key should NOT be in merged result
+        assert!(!table.contains_key("unknown_key"));
     }
 }
 
@@ -205,6 +293,7 @@ mod priority_proptests {
             let cli_flag = cli_path.as_ref().map(|p| PathBuf::from(p));
             let user_config = UserConfig {
                 template_dir: config_path.as_ref().map(|p| PathBuf::from(p)),
+                plugins: Default::default(),
             };
 
             let result = resolve_template_dir(cli_flag.clone(), &user_config);

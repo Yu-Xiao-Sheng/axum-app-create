@@ -14,11 +14,7 @@ impl PluginSandbox {
     /// Validate that a path is within the allowed scope.
     /// Allowed: project directory or plugin's own cache directory.
     /// 验证路径是否在允许范围内
-    pub fn validate_path(
-        path: &Path,
-        project_dir: &Path,
-        plugin_dir: &Path,
-    ) -> Result<()> {
+    pub fn validate_path(path: &Path, project_dir: &Path, plugin_dir: &Path) -> Result<()> {
         // Canonicalize paths for comparison (handle symlinks, .., etc.)
         // If canonicalization fails (path doesn't exist yet), use the raw path
         let check_path = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
@@ -73,10 +69,7 @@ impl PluginSandbox {
     /// Display permission summary and request user confirmation.
     /// Returns true if confirmed, false if rejected.
     /// 显示权限摘要并请求用户确认
-    pub fn confirm_permissions(
-        manifest: &PluginManifest,
-        interactive: bool,
-    ) -> Result<bool> {
+    pub fn confirm_permissions(manifest: &PluginManifest, interactive: bool) -> Result<bool> {
         let perms = &manifest.permissions;
         let has_special_perms = perms.network || perms.filesystem || perms.exec;
 
@@ -109,12 +102,10 @@ impl PluginSandbox {
         }
 
         // In interactive mode, use inquire to ask
-        let confirm = inquire::Confirm::new(
-            "Grant these permissions? / 授予这些权限？",
-        )
-        .with_default(false)
-        .prompt()
-        .map_err(|e| CliError::Plugin(format!("Permission prompt failed: {}", e)))?;
+        let confirm = inquire::Confirm::new("Grant these permissions? / 授予这些权限？")
+            .with_default(false)
+            .prompt()
+            .map_err(|e| CliError::Plugin(format!("Permission prompt failed: {}", e)))?;
 
         Ok(confirm)
     }
@@ -123,9 +114,7 @@ impl PluginSandbox {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::plugin::manifest::{
-        PluginCapabilities, PluginPermissions,
-    };
+    use crate::plugin::manifest::{PluginCapabilities, PluginPermissions};
     use std::collections::HashMap;
 
     fn make_manifest_with_perms(network: bool, filesystem: bool, exec: bool) -> PluginManifest {
@@ -167,24 +156,21 @@ mod tests {
     fn test_validate_path_within_plugin() {
         let project = Path::new("/tmp/my-project");
         let plugin = Path::new("/tmp/plugins/test");
-        assert!(PluginSandbox::validate_path(
-            Path::new("/tmp/plugins/test/templates/a.hbs"),
-            project,
-            plugin,
-        )
-        .is_ok());
+        assert!(
+            PluginSandbox::validate_path(
+                Path::new("/tmp/plugins/test/templates/a.hbs"),
+                project,
+                plugin,
+            )
+            .is_ok()
+        );
     }
 
     #[test]
     fn test_validate_path_outside_scope() {
         let project = Path::new("/tmp/my-project");
         let plugin = Path::new("/tmp/plugins/test");
-        assert!(PluginSandbox::validate_path(
-            Path::new("/etc/passwd"),
-            project,
-            plugin,
-        )
-        .is_err());
+        assert!(PluginSandbox::validate_path(Path::new("/etc/passwd"), project, plugin,).is_err());
     }
 
     #[test]

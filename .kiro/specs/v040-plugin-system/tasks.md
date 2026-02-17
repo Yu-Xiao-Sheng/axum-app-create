@@ -103,8 +103,8 @@ This plan breaks down the v0.4.0 Plugin System into incremental coding tasks. Ea
 - [x] 9. Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 10. Implement plugin loader
-  - [ ] 10.1 Create `src/plugin/loader.rs` with `PluginLoader` and `LoadedPlugin` structs
+- [x] 10. Implement plugin loader
+  - [x] 10.1 Create `src/plugin/loader.rs` with `PluginLoader` and `LoadedPlugin` structs
     - Implement `new()` to initialize cache directory (`~/.axum-app-create/plugins/`)
     - Implement `install()` to install from PluginSource to cache
     - Implement `load_local()` to load plugin from local path
@@ -113,8 +113,8 @@ This plan breaks down the v0.4.0 Plugin System into incremental coding tasks. Ea
     - Load plugin templates from `templates/` subdirectory
     - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.9_
 
-- [ ] 11. Implement plugin manager (facade)
-  - [ ] 11.1 Create `src/plugin/manager.rs` with `PluginManager` struct
+- [x] 11. Implement plugin manager (facade)
+  - [x] 11.1 Create `src/plugin/manager.rs` with `PluginManager` struct
     - Implement `new()` to initialize registry and loader
     - Implement `install()`, `uninstall()`, `enable()`, `disable()`
     - Implement `list()`, `info()`
@@ -128,8 +128,8 @@ This plan breaks down the v0.4.0 Plugin System into incremental coding tasks. Ea
     - Generate dependency graphs, verify uninstalling depended-upon plugins is detected
     - **Validates: Requirements 3.9**
 
-- [ ] 12. Implement plugin configuration merge
-  - [ ] 12.1 Add plugin config parsing to `src/config/user_config.rs`
+- [x] 12. Implement plugin configuration merge
+  - [x] 12.1 Add plugin config parsing to `src/config/user_config.rs`
     - Extend `UserConfig` to support `[plugins.<name>]` sections
     - Implement config merge logic: manifest defaults + user overrides
     - Warn on unknown config keys
@@ -139,8 +139,8 @@ This plan breaks down the v0.4.0 Plugin System into incremental coding tasks. Ea
     - Generate random manifest defaults and user overrides, verify merge correctness
     - **Validates: Requirements 7.1, 7.3**
 
-- [ ] 13. Integrate plugin templates into TemplateResolver
-  - [ ] 13.1 Extend `TemplateResolver::resolve()` in `src/template/resolver.rs` to accept plugin templates
+- [x] 13. Integrate plugin templates into TemplateResolver
+  - [x] 13.1 Extend `TemplateResolver::resolve()` in `src/template/resolver.rs` to accept plugin templates
     - Add plugin templates parameter to resolve method
     - Implement three-tier merge: built-in → plugin (by priority) → user custom
     - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5_
@@ -149,11 +149,11 @@ This plan breaks down the v0.4.0 Plugin System into incremental coding tasks. Ea
     - Generate multi-source template sets, verify priority ordering
     - **Validates: Requirements 5.2, 5.3**
 
-- [ ] 14. Checkpoint - Ensure all tests pass
+- [x] 14. Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 15. Integrate plugin system into generation flow
-  - [ ] 15.1 Update `generate_project_with_templates()` in `src/generator/project.rs`
+- [x] 15. Integrate plugin system into generation flow
+  - [x] 15.1 Update `generate_project_with_templates()` in `src/generator/project.rs`
     - Initialize PluginManager and load enabled plugins
     - Execute `pre_generate` hook before template resolution
     - Execute `modify_context` hook to extend template context
@@ -167,18 +167,18 @@ This plan breaks down the v0.4.0 Plugin System into incremental coding tasks. Ea
     - Generate projects with empty plugin set, compare output to no-plugin generation
     - **Validates: Requirements 10.1**
 
-- [ ] 16. Extend CLI with plugin subcommands
-  - [ ] 16.1 Add `Plugin` variant to `Commands` enum and `PluginAction` subcommand enum in `src/main.rs`
+- [x] 16. Extend CLI with plugin subcommands
+  - [x] 16.1 Add `Plugin` variant to `Commands` enum and `PluginAction` subcommand enum in `src/main.rs`
     - Add `plugin install`, `plugin uninstall`, `plugin enable`, `plugin disable`, `plugin list`, `plugin info`, `plugin run` subcommands
     - Add `--plugin <NAME>` flag to `new` subcommand
     - Update version string to `0.4.0`
     - _Requirements: 9.1, 9.2, 9.3, 9.4, 9.5, 9.6, 9.7_
-  - [ ] 16.2 Wire plugin subcommands to PluginManager methods
+  - [x] 16.2 Wire plugin subcommands to PluginManager methods
     - Implement `run_plugin_command()` function for each plugin action
     - Display bilingual help messages
     - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 6.1, 6.2, 6.3_
 
-- [ ] 17. Checkpoint - Ensure all tests pass
+- [x] 17. Checkpoint - Ensure all tests pass
   - Ensure all tests pass (all existing + new tests), ask the user if questions arise.
 
 - [ ] 18. Integration tests for plugin system
@@ -195,7 +195,7 @@ This plan breaks down the v0.4.0 Plugin System into incremental coding tasks. Ea
   - [ ]* 18.6 Write integration test: backward compatibility — no plugins, all v0.3.0 tests pass
     - _Requirements: 10.1, 10.2, 10.3_
 
-- [ ] 19. Final checkpoint - Ensure all tests pass
+- [-] 19. Final checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
 ## Notes / 备注

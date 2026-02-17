@@ -251,7 +251,10 @@ min_tool_version = "0.4.0"
 other-plugin = ">=0.1.0"
 "#;
         let manifest = ManifestParser::parse(toml).unwrap();
-        assert_eq!(manifest.dependencies.get("other-plugin").unwrap(), ">=0.1.0");
+        assert_eq!(
+            manifest.dependencies.get("other-plugin").unwrap(),
+            ">=0.1.0"
+        );
     }
 
     #[test]
@@ -357,7 +360,15 @@ mod proptests {
             1u32..200,
         )
             .prop_map(
-                |(name, version, description, min_tool_version, capabilities, permissions, priority)| {
+                |(
+                    name,
+                    version,
+                    description,
+                    min_tool_version,
+                    capabilities,
+                    permissions,
+                    priority,
+                )| {
                     PluginManifest {
                         name,
                         version,
