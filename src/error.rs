@@ -33,6 +33,9 @@ pub enum CliError {
 
     #[error("Prompt error: {0}")]
     PromptError(#[from] inquire::InquireError),
+
+    #[error("Plugin error: {0}")]
+    Plugin(String),
 }
 
 /// Result type alias for CLI operations

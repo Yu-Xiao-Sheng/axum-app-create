@@ -1,6 +1,6 @@
 [package]
 name = "axum-app-create"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2024"
 description = "A command-line tool to quickly create Axum web applications"
 license = "MIT OR Apache-2.0"
@@ -59,3 +59,6 @@ similar = "2"
 
 # Cross-platform home directory
 dirs = "6"
+
+# Semantic versioning
+semver = "1"
