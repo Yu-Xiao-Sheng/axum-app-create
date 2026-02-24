@@ -13,10 +13,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Planned / 计划中
-- Plugin system / 插件系统
 - Template marketplace / 模板市场
 - GitLab CI integration / GitLab CI 集成
 - Deployment helpers / 部署助手
+
+---
+
+## [0.4.0] - 2026-02-24
+
+### Added / 新增
+
+#### Plugin System / 插件系统
+- `plugin` subcommand group with `install`, `uninstall`, `enable`, `disable`, `list`, `info`, `run` subcommands / 插件子命令组
+- `PluginManifest` parser for `plugin.toml` manifest files with TOML serialization/deserialization / 插件清单解析器
+- `PluginRegistry` for persistent plugin state in `~/.axum-app-create/plugins.toml` / 插件注册表持久化
+- `PluginLoader` supporting local path and Git repository plugin sources / 支持本地路径和 Git 仓库的插件加载器
+- `DependencyResolver` with Kahn's algorithm topological sort and DFS cycle detection / 依赖解析器（拓扑排序 + 循环检测）
+- `HookExecutor` with 4 hook points: `pre_generate`, `post_generate`, `modify_context`, `modify_templates` / 钩子执行器（4 个钩子点）
+- `PluginSandbox` for filesystem access control and permission validation / 插件安全沙箱
+- `PluginManager` facade for unified plugin lifecycle management / 插件管理器门面
+- Three-tier template merge in `TemplateResolver`: built-in → plugin → user custom / 三层模板合并
+- Plugin configuration merge: manifest defaults + user overrides in `~/.axum-app-create.toml` / 插件配置合并
+- Plugin system integration into project generation flow with all 4 hooks / 插件系统集成到项目生成流程
+- Graceful degradation when plugin system initialization fails / 插件系统初始化失败时优雅降级
+- Version compatibility checking with `semver` crate / 使用 semver 的版本兼容性检查
+
+#### Testing / 测试
+- 10 property-based tests with `proptest` for plugin system correctness / 10 个插件系统属性测试
+- 28 new integration tests for plugin modules / 28 个新集成测试
+- Total: 180 tests passing (152 unit + 28 integration) / 共计 180 个测试通过
+
+### Changed / 更改
+- Version bumped to 0.4.0 / 版本升级到 0.4.0
+- Added `semver = "1"` dependency for version compatibility / 新增 semver 依赖
+- `TemplateResolver::resolve()` extended to accept plugin templates / 模板解析器扩展支持插件模板
+- `generate_project_with_templates()` now initializes plugin system and executes hooks / 项目生成函数集成插件系统
+- `UserConfig` extended with `plugins` field for per-plugin configuration / 用户配置扩展插件配置字段
 
 ---
 

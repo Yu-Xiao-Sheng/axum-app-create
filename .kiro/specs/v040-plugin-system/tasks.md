@@ -195,7 +195,7 @@ This plan breaks down the v0.4.0 Plugin System into incremental coding tasks. Ea
   - [ ]* 18.6 Write integration test: backward compatibility — no plugins, all v0.3.0 tests pass
     - _Requirements: 10.1, 10.2, 10.3_
 
-- [-] 19. Final checkpoint - Ensure all tests pass
+- [x] 19. Final checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
 ## Notes / 备注

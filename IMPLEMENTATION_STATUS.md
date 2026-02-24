@@ -1,8 +1,8 @@
 # Implementation Status: axum-app-create CLI Tool
 
-**Last Updated**: 2026-02-15
+**Last Updated**: 2026-02-24
 **Branch**: `master`
-**Current Version**: 0.3.0
+**Current Version**: 0.4.0
 **Progress**: All phases complete
 
 ---
@@ -33,15 +33,31 @@
 - User configuration file (`~/.axum-app-create.toml`)
 - Subcommand architecture: `new`, `init-template`, `update`
 
+### v0.4.0 — Plugin System ✅
+- Plugin manifest parser (`plugin.toml`) with TOML serialization/deserialization
+- Plugin registry (`~/.axum-app-create/plugins.toml`) for persistent state
+- Plugin loader supporting local path and Git repository sources
+- Dependency resolver with Kahn's topological sort and DFS cycle detection
+- Hook executor with 4 hook points: pre_generate, post_generate, modify_context, modify_templates
+- Plugin sandbox for filesystem access control and permission validation
+- Plugin manager facade for unified lifecycle management
+- Three-tier template merge: built-in → plugin → user custom
+- Plugin configuration merge: manifest defaults + user overrides
+- Plugin system integration into project generation flow
+- Graceful degradation when plugin system initialization fails
+- CLI `plugin` subcommand group: install, uninstall, enable, disable, list, info, run
+- Version compatibility checking with `semver` crate
+
 ---
 
 ## 📊 Test Coverage
 
-- **100** unit tests (lib)
-- **34** integration tests
+- **152** unit tests (lib)
+- **28** integration tests
 - **3** doc tests
-- **13** property-based tests (proptest)
-- **Total: 137 tests**, all passing
+- **10** property-based tests for plugin system (proptest)
+- **13** property-based tests for template/update system (proptest)
+- **Total: 183 tests**, all passing
 
 ## 🔧 CLI Usage
 
@@ -52,6 +68,7 @@ Commands:
   new             Create a new project (default)
   init-template   Export built-in templates for customization
   update          Update a previously generated project
+  plugin          Plugin management (install, uninstall, enable, disable, list, info, run)
 
 Options:
       --author <NAME>          Author name
@@ -73,5 +90,5 @@ Options:
 
 - `cargo fmt -- --check`: ✅ Pass
 - `cargo clippy -- -D warnings`: ✅ Zero warnings
-- `cargo test`: ✅ 137/137 pass
+- `cargo test`: ✅ All tests pass
 - `cargo build`: ✅ Pass

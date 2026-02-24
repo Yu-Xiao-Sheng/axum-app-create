@@ -44,6 +44,7 @@
 - ✅ **Production-Ready Templates / 生产就绪模板**: Includes tracing, error handling, proper structure / 包含日志、错误处理、规范结构
 - ✅ **Bilingual Documentation / 双语文档**: English and Chinese (中文) support / 英文和中文支持
 - ✅ **Git Initialization / Git 初始化**: Automatic git repo, .gitignore, and initial commit / 自动初始化 Git 仓库
+- ✅ **Plugin System / 插件系统**: Extend tool capabilities with installable plugins / 通过可安装插件扩展工具能力
 
 ### Optional Features / 可选功能
 
@@ -180,6 +181,13 @@ axum-app-create [COMMAND] [OPTIONS] [PROJECT_NAME]
 | `new` | Create a new project (default if no subcommand) / 创建新项目（默认） |
 | `init-template` | Export built-in templates for customization / 导出内置模板 |
 | `update` | Update a previously generated project / 更新已生成的项目 |
+| `plugin install` | Install a plugin from local path or Git / 从本地路径或 Git 安装插件 |
+| `plugin uninstall` | Uninstall a plugin / 卸载插件 |
+| `plugin enable` | Enable a disabled plugin / 启用已禁用的插件 |
+| `plugin disable` | Disable a plugin / 禁用插件 |
+| `plugin list` | List installed plugins / 列出已安装插件 |
+| `plugin info` | Show plugin details / 显示插件详情 |
+| `plugin run` | Run a plugin command / 运行插件命令 |
 
 ### Options / 选项
 
@@ -240,6 +248,16 @@ axum-app-create new myapp --template-dir ./my-templates
 # Update existing project (v0.3.0) / 更新已有项目
 axum-app-create update ./myapp --dry-run
 axum-app-create update ./myapp --force
+
+# Plugin management (v0.4.0) / 插件管理
+axum-app-create plugin install ./my-plugin
+axum-app-create plugin install https://github.com/user/plugin.git --git
+axum-app-create plugin list
+axum-app-create plugin enable my-plugin
+axum-app-create plugin disable my-plugin
+axum-app-create plugin info my-plugin
+axum-app-create plugin uninstall my-plugin
+axum-app-create plugin run my-plugin gen-schema
 ```
 
 ---
@@ -490,7 +508,7 @@ https://github.com/Yu-Xiao-Sheng/axum-app-create/issues
 
 ### Phase 3: Ecosystem Integration 🔮 (Future / 未来)
 
-- [ ] Plugin system / 插件系统
+- [x] Plugin system / 插件系统
 - [ ] Template marketplace / 模板市场
 - [ ] GitLab CI integration / GitLab CI 集成
 - [ ] Deployment helpers / 部署助手
@@ -580,9 +598,9 @@ Built with great open-source tools:
 
 ---
 
-**Current Version / 当前版本**: 0.3.0
+**Current Version / 当前版本**: 0.4.0
 
-**Status / 状态**: v0.3.0 Custom Template & Update Complete / v0.3.0 自定义模板与更新机制已完成 ✅
+**Status / 状态**: v0.4.0 Plugin System Complete / v0.4.0 插件系统已完成 ✅
 
 **Year / 年份**: 2026
 
